@@ -81,7 +81,7 @@ def build_dashboard() -> dict:
             'properties': {'markdown': (
                 "# NovaMart Multi-Agent Support - Observability\n"
                 f"Agent logs: `{config.AGENT_LOG_GROUP}` · Guardrail `{config.GUARDRAIL_ID}` "
-                f"v{config.GUARDRAIL_VERSION} · Traces: CloudWatch → X-Ray traces → Service map"
+                f"v{config.GUARDRAIL_VERSION} · Traces: CloudWatch → Application Signals → Trace Map"
             )},
         },
         # Row 1 - volume

@@ -77,8 +77,13 @@ python tests/test_agent.py task6
 python src/agent_orchestrator.py test        # 3 skenario → cetak X-Ray trace id
 ```
 
-Tunggu 30–60 detik → **CloudWatch → X-Ray traces → Service map** → rentang
+Tunggu 30–60 detik → **CloudWatch → Application Signals (APM) → Trace Map** (nama lama: X-Ray traces → Service map) → rentang
 *Last 5 minutes* → screenshot seluruh graph (deliverable wajib).
 
 Log agent bisa dilihat di **CloudWatch → Log groups →
 `/aws/bedrock/agentcore/udacity-agentcore`**.
+
+> Tips screenshot: pilih rentang waktu yang mencakup **skenario retur dan skenario
+> policy**. Rentang 5 menit setelah menjalankan skenario policy/matematika saja
+> tidak akan menampilkan InventoryAgent dan RefundAgent. Pakai 15m atau 1h, lalu
+> perbesar peta (+) sampai nama node terbaca.

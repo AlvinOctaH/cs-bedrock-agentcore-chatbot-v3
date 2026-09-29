@@ -56,13 +56,13 @@ python src/agent_orchestrator.py invoke "How much are 5 items at `$29.99 with 10
 ### A. Skor test 120/120
 1. Jalankan `python tests/test_agent.py all`.
 2. Screenshot bagian daftar ✓ PASS dan baris `Score: 120/120 pts (100%)`.
-3. Simpan sebagai `screenshots/test_all_120.png`.
+3. Kalau tidak muat satu layar, ambil beberapa bagian: `screenshots/test_all_120_1.png` … `_5.png`.
 
 ### B. X-Ray Service Map
 1. `python src/agent_orchestrator.py test` → tunggu sampai muncul
    "X-Ray trace ... published successfully".
 2. Tunggu 30–60 detik.
-3. AWS Console → **CloudWatch** → menu kiri **X-Ray traces → Service map**.
+3. AWS Console → **CloudWatch** → menu kiri **Application Signals (APM) → Trace Map** (versi lama: X-Ray traces → Service map).
 4. Rentang waktu: **Last 5 minutes** (atau 15 menit).
 5. Pastikan terlihat `NovaMart-Orchestrator` → InventoryAgent, RefundAgent,
    PolicyAgent (→ KnowledgeBase:returns/shipping/warranty), CommunicationAgent.
@@ -74,8 +74,8 @@ python src/agent_orchestrator.py invoke "How much are 5 items at `$29.99 with 10
 - [x] 3 Knowledge Base dibuat & di-sync (Task 5)
 - [x] `.env` berisi 3 KB ID, `AGENTCORE_RUNTIME_ARN`, `GUARDRAIL_ID`, `GUARDRAIL_VERSION`
       (file `.env` tidak di-commit; nilainya didokumentasikan di README)
-- [ ] Screenshot test 120/120
-- [ ] Screenshot X-Ray Service Map
+- [x] Screenshot test 120/120 (`test_all_120_1..5.png`)
+- [x] Screenshot X-Ray Service Map (`xray_service_map.png`, 7 node lengkap)
 
 ## 5. Cleanup (SETELAH submit & dinilai)
 

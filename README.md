@@ -176,7 +176,13 @@ Deployed resources (values in the local `.env`, which is git-ignored):
 python tests/test_agent.py all
 ```
 
-![All tests passed - 120/120](screenshots/test_all_120.png)
+| Task 2–4 | Task 5 | Task 5–6 + score |
+|---|---|---|
+| ![Tests part 1](screenshots/test_all_120_1.png) | ![Tests part 3](screenshots/test_all_120_3.png) | ![Tests part 5 - 120/120](screenshots/test_all_120_5.png) |
+
+Full run, in order: [1](screenshots/test_all_120_1.png) · [2](screenshots/test_all_120_2.png) ·
+[3](screenshots/test_all_120_3.png) · [4](screenshots/test_all_120_4.png) ·
+[5 — `Score: 120/120 pts (100%)`](screenshots/test_all_120_5.png)
 
 ### End-to-end scenarios (deployed runtime)
 
@@ -196,9 +202,12 @@ python src/agent_orchestrator.py invoke "How much are 5 items at $29.99 with 10%
 
 ### X-Ray Service Map
 
-`python src/agent_orchestrator.py test` → CloudWatch → X-Ray traces → Service map:
+`python src/agent_orchestrator.py test` → CloudWatch → Application Signals (APM) →
+**Trace Map** (the new name of the X-Ray Service map). `Client → NovaMart-Orchestrator`
+connected to **InventoryAgent, RefundAgent, PolicyAgent, CommunicationAgent** and the
+three **KnowledgeBase: returns / shipping / warranty** nodes:
 
-![X-Ray service map](screenshots/xray_service_map.png)
+![X-Ray trace map - full call chain](screenshots/xray_service_map.png)
 
 ---
 
@@ -206,7 +215,7 @@ python src/agent_orchestrator.py invoke "How much are 5 items at $29.99 with 10%
 
 | Suggestion | Implementation | Evidence |
 |---|---|---|
-| **Adversarial guardrail validation** | [`standout/guardrail_adversarial_test.py`](standout/guardrail_adversarial_test.py): 18 benign and adversarial cases via `ApplyGuardrail` + `--live` cases through the deployed runtime | [`standout/guardrail_report.md`](standout/guardrail_report.md). Finding: v1 let prompt-injection through, so a `PROMPT_ATTACK` filter was added (v2) → 18/18 |
+| **Adversarial guardrail validation** | [`standout/guardrail_adversarial_test.py`](standout/guardrail_adversarial_test.py): 18 benign and adversarial cases via `ApplyGuardrail` + `--live` cases through the deployed runtime | [`standout/guardrail_report.md`](standout/guardrail_report.md). Finding: v1 let prompt-injection through, so a `PROMPT_ATTACK` filter was added (v2) → 18/18, and 5/5 end-to-end through the runtime. Screenshots: [ApplyGuardrail suite](screenshots/guardrail_live_1.png) · [live runtime replies](screenshots/guardrail_live_2.png) |
 | **Persistent conversation memory (DynamoDB)** | [`standout/dynamodb_session_manager.py`](standout/dynamodb_session_manager.py): a DynamoDB `SessionRepository` for Strands (the SDK ships only file/S3), `agent-sessions` table (single-table design, TTL 7 days), wired into the Orchestrator via `build_orchestrator_agent(..., session_manager=...)`; [`standout/chat_with_memory.py`](standout/chat_with_memory.py) resumes a chat from any process | Follow-up "how long is the warranty on **it**?" in a new process → resolved to ORD-27176 and answered for a Premium customer (3 years) |
 | **CloudWatch dashboard** | [`standout/create_dashboard.py`](standout/create_dashboard.py): `NovaMart-MultiAgent-Observability` with requests over time, invocations per agent, avg/p95 latency per agent type, parallel-RAG latency, guardrail triggers by policy type + intervention rate, runtime invocations/latency/errors | ![CloudWatch dashboard](screenshots/cloudwatch_dashboard.png) |
 
@@ -259,7 +268,7 @@ Line numbers refer to `src/agent_orchestrator.py`.
 |---|---|
 | `loggingConfiguration` → `apply_observability_config()` in `try/except` | `configure_observability()` `:1482` |
 | CloudWatch INFO + enabled; X-Ray enabled, `samplingRate=1.0` | `:1494-1508`; `task6` 20/20 |
-| X-Ray Service Map screenshot | [`screenshots/xray_service_map.png`](screenshots/xray_service_map.png) |
+| X-Ray Service Map screenshot (Orchestrator → 4 workers + 3 KnowledgeBase nodes) | [`screenshots/xray_service_map.png`](screenshots/xray_service_map.png) |
 
 ### Industry Best Practices
 
@@ -275,8 +284,8 @@ Line numbers refer to `src/agent_orchestrator.py`.
 - [x] `src/agent_orchestrator.py` — all TODOs implemented (Tasks 2, 3, 4, 6)
 - [x] Three Bedrock Knowledge Bases created and synced (Task 5)
 - [x] `.env` populated (KB IDs, runtime ARN, guardrail ID + numbered version)
-- [x] Screenshot: `python tests/test_agent.py all` → 120/120
-- [x] Screenshot: X-Ray Service Map
+- [x] Screenshot: `python tests/test_agent.py all` → 120/120 (`screenshots/test_all_120_1..5.png`)
+- [x] Screenshot: X-Ray Service Map / Trace Map (`screenshots/xray_service_map.png`)
 
 ## Study Notes (Bahasa Indonesia)
 
