@@ -863,9 +863,15 @@ def build_orchestrator_agent(
     refund_agent:         Agent,
     policy_agent:         Agent,
     communication_agent:  Agent,
+    session_manager=None,
 ) -> Agent:
     """
     Build the Orchestrator Agent that routes requests and manages WorkflowState.
+
+    session_manager (optional): a Strands session manager (e.g. the DynamoDB one
+    in standout/dynamodb_session_manager.py). When given, the orchestrator's
+    conversation is persisted and restored, so follow-up messages in the same
+    chat can refer to earlier turns - even after a restart.
     """
 
     model = BedrockModel(
@@ -883,7 +889,9 @@ the customer's message. Pass these exact values as session_id and customer_id
 to every tool. Call ONE tool at a time and wait for its result.
 
 ROUTING RULES
-Rule 1 - Every request, always first: call initialize_session.
+Rule 1 - Every request, always first: call initialize_session - including
+         follow-up messages in a conversation that was already initialized
+         (it starts a fresh turn for the new message).
 Rule 2 - Order status, order history, return or refund requests:
          call route_to_inventory_agent, THEN route_to_refund_agent.
 Rule 3 - Policy meaning questions (return windows, shipping options or rates,
@@ -905,6 +913,18 @@ A request that matches several rules (e.g. a return plus a policy question)
 uses each matching agent once, in the order inventory -> refund -> policy,
 then Rule 6. Greetings or anything else: Rule 1, then Rule 6.
 
+Personal policy questions - about THIS customer's own order or tier ("how long
+is the warranty on my headphones?", "how long do I have to return it?") -
+combine Rule 4 and Rule 3: route_to_inventory_agent first (tier, order facts),
+then route_to_policy_agent, so the answer applies to this customer.
+General policy questions ("what is the return policy for premium customers?")
+stay Rule 3 only.
+
+Follow-up messages ("how long is the warranty on it?") may refer to earlier
+turns of this conversation. Pass the workers a self-contained request that
+names the order ID or product from earlier (e.g. "How long is the warranty on
+the Wireless Headphones Pro from order ORD-27176?").
+
 Examples
 - "I want to return my order ORD-27176":
   initialize_session -> route_to_inventory_agent -> route_to_refund_agent -> route_to_communication_agent
@@ -914,6 +934,8 @@ Examples
   initialize_session -> route_to_policy_agent -> route_to_communication_agent
 - "Am I a premium member?":
   initialize_session -> route_to_inventory_agent -> route_to_communication_agent
+- "How long is the warranty on my headphones from ORD-27176?":
+  initialize_session -> route_to_inventory_agent -> route_to_policy_agent -> route_to_communication_agent
 - "How much are 5 items at $29.99 with 10% off?":
   initialize_session -> route_to_communication_agent
 
@@ -1072,6 +1094,7 @@ it returned: no preamble, no summary, no additions."""
 
     return Agent(
         name='OrchestratorAgent',
+        agent_id='orchestrator',
         model=model,
         system_prompt=system_prompt,
         tools=[initialize_session, route_to_inventory_agent, route_to_policy_agent,
@@ -1079,6 +1102,7 @@ it returned: no preamble, no summary, no additions."""
         # Routing is a strict sequence (inventory must finish before refund),
         # so tool calls are never executed concurrently.
         tool_executor=SequentialToolExecutor(),
+        session_manager=session_manager,
     )
 
 
