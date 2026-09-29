@@ -241,7 +241,7 @@ Full console output: [`screenshots/agent_orchestrator_test_output.txt`](screensh
 
 | Scenario 1 — return ORD-27176 | Scenario 2 — premium return policy (3 KBs in parallel) | Scenario 3 — 5 × $29.99, 10% off |
 |---|---|---|
-| ![Test scenario 1](screenshots/orchestrator_test_1_1.png) | ![Test scenario 2 - parallel KB retrieval](screenshots/orchestrator_test_2_2.png) | ![Test scenario 3](screenshots/orchestrator_test_3_3.png) |
+| ![Test scenario 1](screenshots/orchestrator_test_1_1.png) | ![Test scenario 2 - parallel KB retrieval](screenshots/orchestrator_test_2_1.png) | ![Test scenario 3](screenshots/orchestrator_test_3_1.png) |
 
 Full run, in order —
 Scenario 1: [1](screenshots/orchestrator_test_1_1.png) · [2](screenshots/orchestrator_test_1_2.png) ·
