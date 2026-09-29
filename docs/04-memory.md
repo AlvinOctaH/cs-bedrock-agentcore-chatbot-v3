@@ -1,35 +1,35 @@
 # 04 — Task 4: AgentCore Memory
 
-File: `src/agent_orchestrator.py` → `configure_memory()` · Test: `python tests/test_agent.py task4` (15 poin)
+File: `src/agent_orchestrator.py` → `configure_memory()` · Test: `python tests/test_agent.py task4` (15 points)
 
-## Konsep
+## Concept
 
-**AgentCore Memory** adalah penyimpanan percakapan terkelola. Ada dua lapisan:
+**AgentCore Memory** is managed conversation storage with two layers:
 
-| Lapisan | Isi | Masa simpan |
+| Layer | Contents | Retention |
 |---|---|---|
-| **Short-term (events)** | Setiap pesan mentah (user/assistant) sebagai *event* | `eventExpiryDuration` (di sini **7 hari**) |
-| **Long-term (records)** | Hasil ekstraksi dari event oleh *memory strategy* | Sampai dihapus |
+| **Short-term (events)** | Every raw message (user/assistant) as an *event* | `eventExpiryDuration` (here **7 days**) |
+| **Long-term (records)** | What a *memory strategy* extracts from the events | Until deleted |
 
-Memory strategy menentukan apa yang diekstrak:
+The memory strategy decides what is extracted:
 
-| Strategy | Hasil |
+| Strategy | Output |
 |---|---|
-| `semanticMemoryStrategy` | Fakta-fakta ("customer punya anjing") |
-| `userPreferenceMemoryStrategy` | Preferensi ("suka jawaban singkat") |
-| **`summaryMemoryStrategy`** ← dipakai | **Ringkasan per sesi** |
+| `semanticMemoryStrategy` | Facts ("the customer has a dog") |
+| `userPreferenceMemoryStrategy` | Preferences ("likes short answers") |
+| **`summaryMemoryStrategy`** ← used | **One summary per session** |
 
-Kenapa SESSION_SUMMARY? Untuk customer support, yang paling berguna adalah konteks
-sesi yang sedang berjalan ("tadi saya sudah kasih nomor order"), sehingga customer
-tidak perlu mengulang informasi antar-giliran.
+Why SESSION_SUMMARY? For customer support the most useful context is the running
+session ("I already gave you my order number"), so customers don't have to repeat
+themselves between turns.
 
-## Implementasi
+## Implementation
 
 ```python
 response = agentcore_control.create_memory(
     name=memory_name,                                   # config.MEMORY_NAME = udacity_agentcore_memory
     description='NovaMart customer support conversation memory: ...',
-    eventExpiryDuration=7,                              # hari
+    eventExpiryDuration=7,                              # days
     memoryStrategies=[{
         'summaryMemoryStrategy': {
             'name': 'SessionSummary',
@@ -41,30 +41,29 @@ response = agentcore_control.create_memory(
 )
 ```
 
-- **Nama** memakai underscore (`udacity_agentcore_memory`) karena nama resource
-  AgentCore tidak boleh memakai tanda hubung.
-- **Namespace** `/summaries/{actorId}/{sessionId}` → ringkasan disimpan per customer
-  (`actorId`) per sesi. `{...}` adalah placeholder yang diisi AgentCore.
-- **`clientToken`** → kalau request terkirim dua kali (retry jaringan), AWS tidak
-  membuat memory ganda.
-- Kode bawaan menunggu status `ACTIVE`, lalu mengembalikan `memoryArn`.
-- Kode bawaan juga mengecek apakah memory dengan nama itu sudah ada, sehingga
-  `deploy` aman dijalankan berulang kali.
+- The **name** uses underscores (`udacity_agentcore_memory`) because AgentCore
+  resource names cannot contain hyphens.
+- The **namespace** `/summaries/{actorId}/{sessionId}` stores summaries per customer
+  (`actorId`) per session. `{...}` are placeholders AgentCore fills in.
+- **`clientToken`** → if the request is sent twice (network retry), AWS does not
+  create a duplicate memory.
+- The provided code waits for `ACTIVE` and returns `memoryArn`, and first checks
+  whether a memory with that name already exists, so `deploy` is safe to re-run.
 
-## Verifikasi
+## Verification
 
 ```powershell
 python tests/test_agent.py task4
 aws bedrock-agentcore-control list-memories --query "memories[].[id,status]"
 ```
 
-Test memeriksa: memory ber-prefix `udacity_agentcore_memory` ada, status `ACTIVE`,
-strategy bertipe `SUMMARIZATION`, dan `eventExpiryDuration == 7`.
+The test checks: a memory prefixed `udacity_agentcore_memory` exists, is `ACTIVE`,
+has a `SUMMARIZATION` strategy and `eventExpiryDuration == 7`.
 
-## Hubungan dengan WorkflowState dan session memory lokal
+## How it relates to WorkflowState and the local session store
 
-| Mekanisme | Cakupan | Fungsi |
+| Mechanism | Scope | Role |
 |---|---|---|
-| **WorkflowState** (DynamoDB) | 1 request/turn | Papan tulis bersama antar-agent |
-| **AgentCore Memory** | Sesi & lintas sesi, 7 hari | Ringkasan percakapan jangka panjang di cloud |
-| **Session storage lokal** (standout, lihat 08) | 1 sesi chat | Riwayat pesan Orchestrator untuk multi-turn |
+| **WorkflowState** (DynamoDB) | One request/turn | Shared whiteboard between agents |
+| **AgentCore Memory** | Session & cross-session, 7 days | Long-term conversation summaries in the cloud |
+| **Local session store** (stand-out, see 08) | One chat session | Exact Orchestrator message history for multi-turn chats |

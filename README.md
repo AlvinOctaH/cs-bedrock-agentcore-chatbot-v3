@@ -2,6 +2,24 @@
 
 **Udacity — AWS Agentic AI Nanodegree — Course 3, Capstone Project 3.3 (NovaMart)**
 
+> **Status:** complete · automated tests **120 / 120** · deployed on AgentCore Runtime ·
+> 3 stand-out extensions · full rebuild guide in [`docs/`](docs/00-overview.md)
+
+## Contents
+
+1. [Overview](#overview)
+2. [Architecture](#architecture)
+3. [Project Structure](#project-structure)
+4. [Quick Start](#quick-start)
+5. [Step-by-Step Build](#step-by-step-build)
+6. [Testing & Evidence](#testing--evidence)
+7. [Stand-out Extensions](#stand-out-extensions)
+8. [Rubric Mapping](#rubric-mapping)
+9. [Submission Checklist](#submission-checklist)
+10. [Study Notes](#study-notes)
+11. [Clean Up](#clean-up-after-grading)
+12. [References](#references)
+
 ---
 
 ## Overview
@@ -79,7 +97,7 @@ cs-bedrock-agentcore-chatbot-v3/
 │   ├── bedrock_kb_retrieval.py     ← provided: KB retrieval helper
 │   └── demo.py                     ← provided: one end-to-end request
 ├── standout/                       ← stand-out extensions (see below)
-├── docs/                           ← step-by-step study notes (Bahasa Indonesia)
+├── docs/                           ← step-by-step rebuild guide (00-overview … 09-troubleshooting)
 ├── screenshots/                    ← submission evidence
 ├── infrastructure/                 ← provided: CloudFormation stack, seed data, cleanup
 ├── tests/test_agent.py             ← provided: 120-point test suite
@@ -93,7 +111,38 @@ The original starter README is kept at [`docs/STARTER_README.md`](docs/STARTER_R
 
 ---
 
-## Part 1 — Infrastructure Setup
+## Quick Start
+
+For someone running it for the first time (full explanation in [`docs/`](docs/00-overview.md)):
+
+```powershell
+# 0. Tools: Python 3.12, AWS CLI v2 (us-east-1), Node.js 20+, uv
+npm install -g @aws/agentcore@0.30.0
+
+# 1. Infrastructure + data                               → docs/01-setup.md
+aws cloudformation deploy --template-file infrastructure/starter_stack.yaml `
+  --stack-name udacity-agentcore --capabilities CAPABILITY_NAMED_IAM --region us-east-1
+py -3.12 -m venv venv; .\venv\Scripts\activate
+pip install -r requirements.txt bedrock-agentcore
+$env:PYTHONUTF8=1
+python infrastructure/seed_data.py
+copy .env.example .env
+
+# 2. Create the 3 Knowledge Bases in the console, put their IDs in .env
+#                                                        → docs/05-knowledge-bases.md
+# 3. Deploy guardrail + runtime + memory + observability → docs/03, 04, 06
+python src/agent_orchestrator.py deploy     # then copy the printed ARN / guardrail into .env
+
+# 4. Verify                                              → docs/07-testing-and-submission.md
+python tests/test_agent.py all              # 120/120
+python src/agent_orchestrator.py chat       # talk to it
+```
+
+---
+
+## Step-by-Step Build
+
+### Part 1 — Infrastructure Setup
 
 Prerequisites: Python 3.12, AWS CLI v2 (region `us-east-1`), Node.js 20+, `uv`, and
 the AgentCore CLI `npm install -g @aws/agentcore@0.30.0`.
@@ -114,9 +163,9 @@ copy .env.example .env
 python config.py
 ```
 
-Detailed notes: [`docs/01-setup-infrastruktur.md`](docs/01-setup-infrastruktur.md).
+Detailed notes: [`docs/01-setup.md`](docs/01-setup.md).
 
-## Part 2 — Building the Agents (Task 2)
+### Part 2 — Building the Agents (Task 2)
 
 All five agents are implemented in `src/agent_orchestrator.py`. Each `build_*_agent()`
 is self-contained: it creates its `BedrockModel` from the `config` model constants,
@@ -143,11 +192,11 @@ Highlights beyond the base requirements:
 
 Detailed notes: [`docs/02-multi-agent-graph.md`](docs/02-multi-agent-graph.md).
 
-## Part 3 — Guardrail, Runtime, Memory, Knowledge Bases, Observability
+### Part 3 — Guardrail, Runtime, Memory, Knowledge Bases, Observability
 
 | Task | Implementation | Notes |
 |---|---|---|
-| **3 Guardrail** | `create_guardrail()` + `_guardrail_policies()` | Content (HIGH / MEDIUM), PII (BLOCK cards and SSN, ANONYMIZE email and phone), 3 DENY topics on the **STANDARD** tier with the `us.guardrail.v1:0` cross-region profile, managed profanity list, published **numbered version**. Pricing negotiation is defined narrowly so the math scenario is allowed. [docs/03](docs/03-guardrail-dan-runtime.md) |
+| **3 Guardrail** | `create_guardrail()` + `_guardrail_policies()` | Content (HIGH / MEDIUM), PII (BLOCK cards and SSN, ANONYMIZE email and phone), 3 DENY topics on the **STANDARD** tier with the `us.guardrail.v1:0` cross-region profile, managed profanity list, published **numbered version**. Pricing negotiation is defined narrowly so the math scenario is allowed. [docs/03](docs/03-guardrail-and-runtime.md) |
 | **3 Runtime** | `deploy_to_agentcore_runtime()` | 8 runtime env vars → `configure_runtime(PUBLIC, HTTP, stack execution role)` → `agentcore deploy` → ARN |
 | **4 Memory** | `configure_memory()` | `summaryMemoryStrategy`, `eventExpiryDuration=7`, name + description, idempotent `clientToken`. [docs/04](docs/04-memory.md) |
 | **5 Knowledge Bases** | AWS Console | 3 self-managed KBs, Titan Text Embeddings V2 (1024), S3 Vectors bucket from the stack + matching index, synced. [docs/05](docs/05-knowledge-bases.md) |
@@ -211,7 +260,7 @@ three **KnowledgeBase: returns / shipping / warranty** nodes:
 
 ---
 
-## Stand-out Suggestions Implemented
+## Stand-out Extensions
 
 | Suggestion | Implementation | Evidence |
 |---|---|---|
@@ -287,14 +336,14 @@ Line numbers refer to `src/agent_orchestrator.py`.
 - [x] Screenshot: `python tests/test_agent.py all` → 120/120 (`screenshots/test_all_120_1..5.png`)
 - [x] Screenshot: X-Ray Service Map / Trace Map (`screenshots/xray_service_map.png`)
 
-## Study Notes (Bahasa Indonesia)
+## Study Notes
 
 | | |
 |---|---|
-| [00 Gambaran besar](docs/00-gambaran-besar.md) | [05 Knowledge Bases](docs/05-knowledge-bases.md) |
-| [01 Setup infrastruktur](docs/01-setup-infrastruktur.md) | [06 Observability](docs/06-observability.md) |
-| [02 Multi-agent graph](docs/02-multi-agent-graph.md) | [07 Testing & submission](docs/07-testing-dan-submission.md) |
-| [03 Guardrail & runtime](docs/03-guardrail-dan-runtime.md) | [08 Stand-out](docs/08-standout.md) |
+| [00 Overview](docs/00-overview.md) | [05 Knowledge Bases](docs/05-knowledge-bases.md) |
+| [01 Setup](docs/01-setup.md) | [06 Observability](docs/06-observability.md) |
+| [02 Multi-agent graph](docs/02-multi-agent-graph.md) | [07 Testing & submission](docs/07-testing-and-submission.md) |
+| [03 Guardrail & runtime](docs/03-guardrail-and-runtime.md) | [08 Stand-out](docs/08-standout.md) |
 | [04 Memory](docs/04-memory.md) | [09 Troubleshooting](docs/09-troubleshooting.md) |
 
 ## Clean Up (after grading)

@@ -1,140 +1,141 @@
-# 08 — Fitur Stand-out
+# 08 — Stand-out Extensions
 
-Rubric menyarankan 4 hal untuk membuat project "stand out". Tiga di antaranya
-dikerjakan. Semua file ada di folder `standout/`.
+The rubric suggests four ways to make the project stand out. Three were built;
+everything lives in `standout/`.
 
-| # | Saran rubric | Status |
+| # | Rubric suggestion | Status |
 |---|---|---|
-| 1 | Uji adversarial Guardrail + dokumentasi hasil | ✅ |
-| 2 | Memori percakapan persisten di DynamoDB `agent-sessions` untuk Orchestrator | ✅ |
-| 3 | CloudWatch dashboard: invocation, latency per agent, frekuensi guardrail | ✅ |
-| 4 | Cognito + frontend | ❌ tidak dikerjakan (paling besar; bukan bagian penilaian wajib) |
+| 1 | Adversarial guardrail testing + documented results | ✅ |
+| 2 | Persistent conversation memory in a DynamoDB `agent-sessions` table for the Orchestrator | ✅ |
+| 3 | CloudWatch dashboard: invocations, latency per agent, guardrail trigger frequency | ✅ |
+| 4 | Cognito + frontend | ❌ not built (largest item; not part of the required grading) |
 
 ---
 
-## 1. Uji adversarial Guardrail
+## 1. Adversarial guardrail testing
 
-**File:** `standout/guardrail_adversarial_test.py` → laporan `standout/guardrail_report.md`
+**File:** `standout/guardrail_adversarial_test.py` → report `standout/guardrail_report.md`
 
-### Cara kerja
+### How it works
 
-- **18 kasus** dikirim ke guardrail lewat API `ApplyGuardrail` (evaluasi policy yang
-  sama dengan yang dipakai `BedrockModel` para agent), baik sebagai `INPUT`
-  (pesan customer) maupun `OUTPUT` (jawaban agent).
-- Setiap kasus punya ekspektasi: `ALLOW`, `BLOCK`, atau `ANONYMIZE`.
-- Mode `--live` mengirim 5 kasus **end-to-end ke AgentCore Runtime yang ter-deploy**,
-  jadi terbukti guardrail aktif di sistem sebenarnya, bukan hanya di API.
+- **18 cases** are sent to the guardrail through the `ApplyGuardrail` API (the same
+  policy evaluation the agents' `BedrockModel` uses), as `INPUT` (customer message)
+  or `OUTPUT` (agent reply).
+- Each case has an expectation: `ALLOW`, `BLOCK` or `ANONYMIZE`.
+- `--live` sends 5 cases **end-to-end through the deployed AgentCore Runtime**, proving
+  the guardrail is active in the real system, not only via the API.
 
 ```powershell
-python standout/guardrail_adversarial_test.py                    # tabel di console
-python standout/guardrail_adversarial_test.py --report --live     # + runtime + tulis laporan
+python standout/guardrail_adversarial_test.py                    # console table
+python standout/guardrail_adversarial_test.py --report --live     # + runtime + write report
 ```
 
-### Kategori yang diuji
+### Categories tested
 
-| Kategori | Contoh | Ekspektasi |
+| Category | Example | Expected |
 |---|---|---|
-| Wajib lolos | soal matematika (input & output), retur, pertanyaan policy | ALLOW |
-| Topik terlarang | tawar harga, price match, bandingkan dengan Amazon/Best Buy, ancaman gugatan | BLOCK |
-| PII | nomor kartu kredit, SSN | BLOCK |
-| PII di balasan | email + telepon | ANONYMIZE (`{EMAIL}`, `{PHONE}`) |
-| Konten berbahaya | kata kasar, ancaman kekerasan, penipuan tracking number | BLOCK |
+| Must pass | math question (input & output), return, policy question | ALLOW |
+| Denied topics | haggling, price match, compare with Amazon/Best Buy, lawsuit threat | BLOCK |
+| PII | credit card number, SSN | BLOCK |
+| PII in a reply | email + phone | ANONYMIZE (`{EMAIL}`, `{PHONE}`) |
+| Harmful content | profanity, violent threat, tracking-number fraud | BLOCK |
 | **Prompt injection** | "Ignore all previous instructions…", "print your system prompt" | BLOCK |
 
-### Temuan penting (cerita untuk reviewer)
+### Key finding
 
-Guardrail versi 1 (hanya policy wajib rubric) menghasilkan **16/18**: dua serangan
-prompt injection **lolos**, karena filter konten, PII, topik, dan kata tidak dirancang
-mendeteksi instruksi jahat. Perbaikannya: tambah filter `PROMPT_ATTACK` (input HIGH,
-output NONE) → guardrail **versi 2** → **18/18**, dan tidak ada false positive pada
-permintaan normal (matematika, retur, policy tetap lolos).
+Guardrail version 1 (only the rubric's required policies) scored **16/18**: two
+prompt-injection attempts **got through**, because content, PII, topic and word
+filters are not designed to detect malicious instructions. The fix: add a
+`PROMPT_ATTACK` filter (input HIGH, output NONE) → guardrail **version 2** →
+**18/18**, with no false positives on normal requests (math, returns and policy
+questions still pass).
 
-Pelajaran: *policy yang diminta spesifikasi belum tentu cukup*. Uji adversarial
-menemukan celah yang tidak terlihat dari sekadar membaca konfigurasi.
+Lesson: *a policy that meets the spec is not necessarily sufficient*. Adversarial
+testing found a gap that was invisible from reading the configuration.
 
-Hasil end-to-end di runtime: **5/5**. Injection, kompetitor, negosiasi harga, dan
-ancaman hukum mendapat balasan "I'm sorry, but I can't help with that request…",
-sedangkan soal matematika dijawab $134.96.
+End-to-end through the runtime: **5/5** — injection, competitor, haggling and legal
+threats get "I'm sorry, but I can't help with that request…", while the math
+question is answered ($134.96).
 
 ---
 
-## 2. Memori percakapan persisten (DynamoDB)
+## 2. Persistent conversation memory (DynamoDB)
 
-**File:** `standout/dynamodb_session_manager.py`, `standout/chat_with_memory.py`,
-parameter `session_manager` di `build_orchestrator_agent()`.
+**Files:** `standout/dynamodb_session_manager.py`, `standout/chat_with_memory.py`,
+the `session_manager` parameter of `build_orchestrator_agent()`.
 
-### Masalah yang diselesaikan
+### Problem solved
 
-Tanpa memori, setiap proses baru membuat Orchestrator "lupa". Pertanyaan lanjutan
-seperti *"berapa lama garansinya?"* ("it" = produk dari pesan sebelumnya) tidak bisa
-dijawab kalau aplikasinya restart atau berpindah server.
+Without memory, every new process makes the Orchestrator "forget". A follow-up like
+*"how long is the warranty on it?"* ("it" = the product from the previous message)
+can't be answered after a restart or on another server.
 
-### Desain
+### Design
 
-Strands (v1.57) hanya menyediakan session manager File dan S3. Rubric menyebut
-`DynamoDbSessionStorage`, tetapi kelas itu **tidak ada** di SDK. Solusinya memakai
-titik ekstensi resmi SDK: implementasi `SessionRepository` sendiri +
+Strands (v1.57) ships only File and S3 session managers. The rubric mentions a
+`DynamoDbSessionStorage` class, but it **does not exist** in the SDK. The solution
+uses the SDK's official extension point: a custom `SessionRepository` +
 `RepositorySessionManager`.
 
-Tabel `udacity-agentcore-agent-sessions` (on-demand, TTL 7 hari) memakai
+Table `udacity-agentcore-agent-sessions` (on-demand, 7-day TTL) uses a
 **single-table design**:
 
-| pk | sk | isi |
+| pk | sk | contents |
 |---|---|---|
-| `SESSION#memdemo02` | `SESSION` | metadata sesi |
-| `SESSION#memdemo02` | `AGENT#orchestrator` | state agent |
-| `SESSION#memdemo02` | `AGENT#orchestrator#MSG#000000000000` | pesan ke-0 |
-| `SESSION#memdemo02` | `AGENT#orchestrator#MSG#000000000001` | pesan ke-1 … |
+| `SESSION#memdemo02` | `SESSION` | session metadata |
+| `SESSION#memdemo02` | `AGENT#orchestrator` | agent state |
+| `SESSION#memdemo02` | `AGENT#orchestrator#MSG#000000000000` | message 0 |
+| `SESSION#memdemo02` | `AGENT#orchestrator#MSG#000000000001` | message 1 … |
 
-- Nomor pesan di-*zero-pad* (12 digit) supaya urutan sort key = urutan pesan, dan
-  `list_messages` cukup satu `Query` + `begins_with`.
-- Data disimpan sebagai string JSON supaya tidak ada masalah `Decimal`/float di DynamoDB.
-- Setiap pesan ditulis **saat itu juga** (bukan di akhir), jadi aman kalau proses mati di tengah jalan.
+- Message numbers are zero-padded (12 digits) so sort-key order = message order, and
+  `list_messages` is a single `Query` with `begins_with`.
+- Data is stored as a JSON string to avoid DynamoDB `Decimal`/float issues.
+- Each message is written **immediately** (not at the end), so a crash mid-turn loses nothing.
 
-### Integrasi
+### Integration
 
 ```python
 orchestrator = build_orchestrator_agent(inventory, refund, policy, communication,
                                         session_manager=DynamoDbSessionManager(session_id))
 ```
 
-Parameter ini opsional (default `None`), jadi perilaku, test, dan runtime lain tidak berubah.
-Prompt Orchestrator juga diberi aturan: pesan lanjutan diteruskan ke worker sebagai
-request yang lengkap (menyebut nomor order/produk), dan pertanyaan kebijakan yang
-*personal* ("garansi headphone saya") → Inventory dulu, lalu Policy.
+The parameter is optional (default `None`), so behaviour, tests and the runtime are
+unchanged. The Orchestrator prompt also gained rules: follow-ups are passed to
+workers as self-contained requests (naming the order/product), and *personal* policy
+questions ("my headphones' warranty") → Inventory first, then Policy.
 
-### Demo (sudah dijalankan)
+### Demo (actually run)
 
 ```powershell
 python standout/dynamodb_session_manager.py create-table
 python standout/chat_with_memory.py --session memdemo02 --customer CUST-001 --ask "I'd like to return my wireless headphones from order ORD-27176, they hurt my ears."
-# proses BARU:
+# NEW process:
 python standout/chat_with_memory.py --session memdemo02 --customer CUST-001 --ask "Actually, how long is the warranty on it, in case I decide to keep them?"
 python standout/chat_with_memory.py --session memdemo02 --customer CUST-001 --ask "Thanks! And do I get free shipping on my next order?"
-python standout/dynamodb_session_manager.py show memdemo02     # lihat isi tabel
+python standout/dynamodb_session_manager.py show memdemo02     # inspect the table
 ```
 
-| Turn | Proses | Pesan dipulihkan | Rute | Hasil |
+| Turn | Process | Messages restored | Route | Result |
 |---|---|---|---|---|
-| 1 | baru | 0 | init → Inventory → Refund → Communication | Retur disetujui + RMA |
-| 2 | **baru** | **10** | init → Inventory → Policy → Communication | "it" = Wireless Headphones Pro; Premium → garansi 3 tahun (s/d Sep 2029) |
-| 3 | **baru** | **18** | init → Inventory → Policy → Communication | Premium → free expedited shipping |
+| 1 | new | 0 | init → Inventory → Refund → Communication | Return approved + RMA |
+| 2 | **new** | **10** | init → Inventory → Policy → Communication | "it" = Wireless Headphones Pro; Premium → 3-year warranty (to Sep 2029) |
+| 3 | **new** | **18** | init → Inventory → Policy → Communication | Premium → free expedited shipping |
 
-### Hubungan dengan AgentCore Memory (Task 4)
+### How it complements AgentCore Memory (Task 4)
 
-| | DynamoDB session storage (standout) | AgentCore Memory (Task 4) |
+| | DynamoDB session store (stand-out) | AgentCore Memory (Task 4) |
 |---|---|---|
-| Isi | Riwayat pesan **persis** (termasuk tool call) | **Ringkasan** sesi hasil ekstraksi LLM |
-| Dikontrol oleh | Aplikasi kita (tabel sendiri) | Layanan terkelola AWS |
-| Kegunaan | Melanjutkan percakapan yang sama secara verbatim | Konteks jangka panjang & lintas sesi |
-| Biaya konteks | Tumbuh seiring panjang percakapan | Ringkas |
+| Contents | **Exact** message history (incl. tool calls) | LLM-extracted session **summary** |
+| Controlled by | The application (own table) | Managed AWS service |
+| Use | Resume the same conversation verbatim | Long-term, cross-session context |
+| Context cost | Grows with conversation length | Compact |
 
-Keduanya saling melengkapi: DynamoDB untuk "short-term memory" yang presisi,
-AgentCore Memory untuk "long-term memory" yang ringkas.
+Together: DynamoDB as precise short-term memory, AgentCore Memory as compact
+long-term memory.
 
 ---
 
-## 3. CloudWatch Dashboard
+## 3. CloudWatch dashboard
 
 **File:** `standout/create_dashboard.py` → dashboard `NovaMart-MultiAgent-Observability`
 
@@ -142,20 +143,20 @@ AgentCore Memory untuk "long-term memory" yang ringkas.
 python standout/create_dashboard.py
 ```
 
-| Widget | Sumber data |
+| Widget | Data source |
 |---|---|
 | Customer requests over time | Logs Insights: `tool done route_to_communication_agent` (1 per request) |
 | Agent invocations by agent | Logs Insights: parse `tool done route_to_*` |
-| **Latency per agent type** (avg, p95, max) | Logs Insights: parse durasi `(12.34s)` |
-| Average latency per agent over time | Logs Insights, per 5 menit |
-| Parallel RAG latency | `search_all_policies` vs retriever tunggal |
-| **Guardrail evaluations vs interventions** | Metrik `AWS/Bedrock/Guardrails` |
-| **Guardrail triggers by policy type** | Dimensi `GuardrailPolicyType` (Content / SensitiveInformation / Topic / Word) |
+| **Latency per agent type** (avg, p95, max) | Logs Insights: parse the `(12.34s)` duration |
+| Average latency per agent over time | Logs Insights, 5-minute buckets |
+| Parallel RAG latency | `search_all_policies` vs single retrievers |
+| **Guardrail evaluations vs interventions** | `AWS/Bedrock/Guardrails` metrics |
+| **Guardrail triggers by policy type** | `GuardrailPolicyType` dimension (Content / SensitiveInformation / Topic / Word) |
 | Guardrail intervention rate (%) | Metric math: intervened ÷ evaluations × 100 |
-| AgentCore Runtime invocations & errors | Metrik `AWS/Bedrock-AgentCore` |
-| AgentCore Runtime latency | Metrik `AWS/Bedrock-AgentCore`, `Operation=InvokeAgentRuntime` |
+| AgentCore Runtime invocations & errors | `AWS/Bedrock-AgentCore` metrics |
+| AgentCore Runtime latency | `AWS/Bedrock-AgentCore`, `Operation=InvokeAgentRuntime` |
 
-Data nyata dari log (contoh saat pengujian):
+Real data from the logs during testing:
 
 | Agent | Calls | Avg (s) | p95 (s) |
 |---|---|---|---|
@@ -164,16 +165,14 @@ Data nyata dari log (contoh saat pengujian):
 | inventory | 5 | 14.8 | 26.0 |
 | communication | 7 | 10.8 | 15.3 |
 
-Insight: PolicyAgent paling lambat (3 retriever LLM + sintesis). Kandidat optimasi:
-retriever cukup memanggil KB langsung tanpa LLM, atau memakai model yang lebih kecil
-(Haiku) untuk retriever.
+Insight: the PolicyAgent is the slowest (3 LLM retrievers + synthesis). Optimisation
+candidates: let retrievers call the KB directly without an LLM, or use a smaller
+model (Haiku) for them.
 
-Catatan teknis:
-- Metric widget memakai ekspresi `SEARCH()` dengan **dimension set eksplisit**,
-  sehingga setiap seri dihitung tepat sekali.
-- Namespace runtime yang benar adalah `AWS/Bedrock-AgentCore` (hasil `list-metrics`), bukan `Bedrock-AgentCore`.
+Technical notes:
+- Metric widgets use `SEARCH()` expressions with **explicit dimension sets**, so each
+  series is counted exactly once.
+- The runtime namespace is `AWS/Bedrock-AgentCore` (found with `list-metrics`), not `Bedrock-AgentCore`.
 
-### Screenshot dashboard
-
-Buka URL yang dicetak script → rentang waktu **3h** → screenshot →
+Screenshot: open the URL printed by the script → time range **3h** →
 `screenshots/cloudwatch_dashboard.png`.

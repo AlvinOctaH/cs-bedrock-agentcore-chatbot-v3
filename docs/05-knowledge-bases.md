@@ -1,79 +1,75 @@
-# Task 5 — Membuat 3 Bedrock Knowledge Base (manual, AWS Console)
+# 05 — Task 5: Three Bedrock Knowledge Bases (manual, AWS Console)
 
-> Bagian ini **tidak ada kodenya** — dikerjakan di AWS Console. Hasil akhirnya
-> adalah 3 Knowledge Base ID yang ditaruh di `.env`.
+> There is **no code** in this task — it is done in the AWS Console. The result is
+> three Knowledge Base IDs in `.env`.
 
-## Konsep singkat
+## Concept
 
-**Knowledge Base (KB)** = layanan RAG terkelola dari Bedrock. Kita tunjuk sebuah
-folder (prefix) di S3, lalu Bedrock otomatis:
+A **Knowledge Base (KB)** is Bedrock's managed RAG service. Point it at a folder
+(prefix) in S3 and Bedrock automatically:
 
-1. **Parsing & chunking** — memecah dokumen jadi potongan kecil (chunk).
-2. **Embedding** — mengubah tiap chunk jadi vektor angka dengan model
-   *Titan Text Embeddings V2* (1024 dimensi).
-3. **Indexing** — menyimpan vektor ke **S3 Vectors** (vector store serverless, murah,
-   tanpa cluster OpenSearch).
+1. **Parses & chunks** the documents into small pieces.
+2. **Embeds** each chunk into a vector with *Titan Text Embeddings V2* (1024 dimensions).
+3. **Indexes** the vectors in **S3 Vectors** (serverless, cheap, no OpenSearch cluster).
 
-Saat agent bertanya, `bedrock-agent-runtime.retrieve()` mengubah pertanyaan jadi vektor,
-mencari chunk yang paling mirip (cosine similarity), dan mengembalikan top-k passage.
+At query time `bedrock-agent-runtime.retrieve()` embeds the question, finds the most
+similar chunks (cosine similarity) and returns the top-k passages.
 
-Kenapa **3 KB terpisah**, bukan satu? Karena PolicyAgent memakai pola *multi-agent RAG*:
-3 retriever sub-agent (Returns, Shipping, Warranty) masing-masing punya KB sendiri dan
-berjalan **paralel**. Tiap domain jadi terisolasi — hasil pencarian "garansi" tidak
-tercampur dengan dokumen pengiriman.
+Why **three separate KBs** instead of one? The PolicyAgent uses *multi-agent RAG*:
+three retriever sub-agents (Returns, Shipping, Warranty) each own a KB and run **in
+parallel**. Each domain stays isolated — a "warranty" search is never polluted by
+shipping documents.
 
-Semua bahan sudah dibuat oleh CloudFormation stack + `seed_data.py`:
+Everything needed was created by the CloudFormation stack + `seed_data.py`:
 
-| Bahan | Nilai (cek dengan `python config.py`) |
+| Ingredient | Value (see `python config.py`) |
 |---|---|
-| S3 bucket dokumen | `udacity-agentcore-policy-docs-<ACCOUNT_ID>-<suffix>` |
+| Document bucket | `udacity-agentcore-policy-docs-<ACCOUNT_ID>-<suffix>` |
 | Vector bucket (S3 Vectors) | `udacity-agentcore-vectors-<ACCOUNT_ID>-<suffix>` |
-| Vector index | `returns-policy-index`, `shipping-policy-index`, `warranty-policy-index` (1024 dimensi, cosine, float32) |
+| Vector indexes | `returns-policy-index`, `shipping-policy-index`, `warranty-policy-index` (1024 dims, cosine, float32) |
 
-## Langkah 0 — Cek dokumen di S3
+## Step 0 — Check the documents in S3
 
 ```bash
-python config.py        # catat "Policy Bucket" dan "Vector Bucket"
+python config.py        # note "Policy Bucket" and "Vector Bucket"
 aws s3 ls s3://<Policy Bucket>/policies/ --recursive
 ```
 
-Harus ada 6 file: `return_policy.txt`, `shipping_policy.txt`, `warranty_policy.txt`,
-dan `customer_tiers.txt` di ketiga folder.
+You should see 6 files: `return_policy.txt`, `shipping_policy.txt`,
+`warranty_policy.txt`, and `customer_tiers.txt` in all three folders.
 
-## Langkah 1 — Buat Returns KB
+## Step 1 — Create the Returns KB
 
-1. Buka **AWS Console** → pastikan region **N. Virginia (us-east-1)** (pojok kanan atas).
-2. Cari **Amazon Bedrock** → menu kiri **Build → Knowledge Bases**.
-3. Klik **Create** → pilih **Knowledge Base with vector store**.
-   > ⚠️ Jangan pilih *Managed Knowledge Base* — itu membuat vector bucket baru
-   > yang berbeda dari milik stack, dan backing store-nya tidak bisa diganti.
-4. **Step 1 – Provide Knowledge Base details**
-   - Knowledge Base name: `novamart-returns-policy-kb`
-   - IAM permissions: **Create and use a new service role** (biarkan nama default)
-   - Data source: **Amazon S3**
-   - Klik **Next**
-5. **Step 2 – Configure data source**
-   - Data source name: biarkan default (atau `returns-docs`)
-   - S3 URI: klik **Browse S3** → pilih Policy Bucket → masuk `policies/` → pilih folder
-     `returns/` → **Choose**. Hasilnya: `s3://<Policy Bucket>/policies/returns/`
-   - Parsing & chunking: biarkan **Default**
-   - Klik **Next**
-6. **Step 3 – Configure data storage and processing**
-   - Embeddings model: klik **Select model** → **Amazon → Titan Text Embeddings V2** → Apply
-     (Embedding type: *Floating-point vector embeddings*, dimensions: **1024**)
+1. Open the **AWS Console** → make sure the region is **N. Virginia (us-east-1)** (top right).
+2. Search **Amazon Bedrock** → left menu **Build → Knowledge Bases**.
+3. **Create** → **Knowledge Base with vector store**. When asked for the data type,
+   choose **Unstructured data** (plain text documents).
+   > ⚠️ Do not choose *Managed Knowledge Base* — it creates a different vector
+   > bucket from the stack's, and the backing store cannot be changed later.
+4. **Step 1 – Knowledge Base details**
+   - Name: `novamart-returns-policy-kb`
+   - IAM permissions: **Create and use a new service role** (default name)
+   - Data source: **Amazon S3** → **Next**
+5. **Step 2 – Data source**
+   - S3 URI: **Browse S3** → Policy Bucket → `policies/` → select the radio button of
+     `returns/` → **Choose** → `s3://<Policy Bucket>/policies/returns/`
+   - Parsing & chunking: **Default** → **Next**
+6. **Step 3 – Storage and processing**
+   - Embeddings model: **Select model** → **Amazon → Titan Text Embeddings V2** → Apply
+     (floating-point vectors, **1024** dimensions)
    - Vector store creation method: **Use an existing vector store**
    - Vector store: **Amazon S3 Vectors**
-   - S3 vector bucket ARN: pilih `udacity-agentcore-vectors-…`
-   - S3 vector index ARN: pilih **`returns-policy-index`**
-   - Klik **Next**
-7. **Step 4 – Review and create** → **Create Knowledge Base**. Tunggu ±1 menit sampai status *Available*.
-8. Di halaman KB, bagian **Data source** → centang data source → klik **Sync**.
-   Tunggu status sync **Available / Completed** (±1 menit).
-9. Salin **Knowledge Base ID** (10 karakter, contoh `ABCD1234EF`) dari bagian *Knowledge Base overview*.
+   - S3 vector bucket ARN: `udacity-agentcore-vectors-…`
+   - S3 vector index ARN: **`returns-policy-index`** → **Next**
+7. **Step 4 – Review and create** → **Create Knowledge Base** (~1 minute).
+8. On the KB page → **Data source** → tick the data source → **Sync** → wait for
+   **Available / Completed**.
+9. Copy the **Knowledge Base ID** (10 characters, e.g. `ABCD1234EF`).
 
-## Langkah 2 & 3 — Shipping KB dan Warranty KB
+## Steps 2 & 3 — Shipping and Warranty KBs
 
-Ulangi Langkah 1 dengan perbedaan berikut (yang lain sama persis):
+Repeat Step 1 with these differences (everything else identical — same embedding
+model, same vector bucket, same *Unstructured* choice):
 
 | Setting | Shipping KB | Warranty KB |
 |---|---|---|
@@ -81,33 +77,34 @@ Ulangi Langkah 1 dengan perbedaan berikut (yang lain sama persis):
 | S3 URI | `s3://<Policy Bucket>/policies/shipping/` | `s3://<Policy Bucket>/policies/warranty/` |
 | Vector index | `shipping-policy-index` | `warranty-policy-index` |
 
-Jangan lupa **Sync** masing-masing.
+Remember to **Sync** each one.
 
-## Langkah 4 — Isi `.env`
+## Step 4 — Fill in `.env`
 
 ```
-RETURNS_KB_ID=<ID returns>
-SHIPPING_KB_ID=<ID shipping>
-WARRANTY_KB_ID=<ID warranty>
+RETURNS_KB_ID=<returns ID>
+SHIPPING_KB_ID=<shipping ID>
+WARRANTY_KB_ID=<warranty ID>
 ```
 
-## Langkah 5 — Verifikasi
+## Step 5 — Verify
 
 ```bash
-python config.py                   # 3 KB ID sudah terisi
-python tests/test_agent.py task5   # target 20/20
+python config.py                   # three KB IDs filled in
+python tests/test_agent.py task5   # target 25/25
 ```
 
-Opsional, uji langsung di Console: buka KB → tombol **Test** → pilih model apa saja →
-tanya *"How long is the return window for Premium customers?"* → harus menjawab 60 hari
-dengan sumber `return_policy.txt` / `customer_tiers.txt`.
+Optional console check: open a KB → **Test** → any model → ask *"How long is the
+return window for Premium customers?"* → should answer 60 days citing
+`return_policy.txt` / `customer_tiers.txt`.
 
 ## Troubleshooting
 
-| Gejala | Penyebab / solusi |
+| Symptom | Cause / fix |
 |---|---|
-| Vector index tidak muncul di dropdown | Region salah (harus us-east-1), atau stack belum `CREATE_COMPLETE` |
-| Error dimensi saat create | Embeddings model bukan Titan V2 1024 dimensi — index stack dibuat 1024 |
-| `retrieve()` mengembalikan kosong | Belum klik **Sync**, atau ID di `.env` tertukar |
-| test task5 bilang "no completed ingestion job" | Sync belum selesai / gagal — lihat tab *Sync history* |
-| Sudah deploy runtime sebelum KB dibuat | Jalankan ulang `python src/agent_orchestrator.py deploy` — mengubah `.env` saja tidak mengubah runtime yang sudah ter-deploy |
+| Structured or unstructured? | **Unstructured** (text documents) |
+| Vector index not in the dropdown | Wrong region (must be us-east-1) or stack not `CREATE_COMPLETE` |
+| Dimension error on create | Embedding model is not Titan V2 at 1024 dims — the stack's indexes are 1024 |
+| `retrieve()` returns nothing | **Sync** not run, or IDs swapped in `.env` |
+| task5 says "no completed ingestion job" | Sync still running / failed — check *Sync history* |
+| Runtime deployed before the KBs existed | Re-run `python src/agent_orchestrator.py deploy` — editing `.env` doesn't update the runtime |

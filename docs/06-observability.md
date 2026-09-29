@@ -1,22 +1,22 @@
 # 06 — Task 6: Observability (CloudWatch Logs + X-Ray)
 
-File: `src/agent_orchestrator.py` → `configure_observability()` · Test: `python tests/test_agent.py task6` (20 poin)
+File: `src/agent_orchestrator.py` → `configure_observability()` · Test: `python tests/test_agent.py task6` (20 points)
 
-## Konsep
+## Concept
 
-Sistem multi-agent sulit di-debug: satu request melewati 3–5 agent, belasan
-panggilan LLM, DynamoDB, dan Knowledge Base. Observability menjawab
-*"apa yang terjadi, di mana, dan berapa lama?"*.
+Multi-agent systems are hard to debug: one request passes through 3–5 agents, a
+dozen LLM calls, DynamoDB and Knowledge Bases. Observability answers
+*"what happened, where, and how long did it take?"*.
 
-| Pilar | Layanan | Isi |
+| Pillar | Service | Contents |
 |---|---|---|
-| **Logs** | CloudWatch Logs | Pemanggilan tool, argumen, durasi, trace id (level INFO) |
-| **Traces** | AWS X-Ray | Pohon pemanggilan per request: Orchestrator → Worker → Knowledge Base, dengan latensi tiap node |
+| **Logs** | CloudWatch Logs | Tool calls, arguments, durations, trace ids (INFO level) |
+| **Traces** | AWS X-Ray | Per-request call tree: Orchestrator → Worker → Knowledge Base, with latency per node |
 
-**Sampling rate** = persentase request yang di-trace. Dev: **1.0 (100%)** agar setiap
-request terlihat. Production biasanya ~0.05 (5%) untuk menghemat biaya.
+**Sampling rate** = share of requests that are traced. Development: **1.0 (100%)**
+so every request is visible. Production is usually ~0.05 (5%) to save cost.
 
-## Implementasi
+## Implementation
 
 ```python
 logging_configuration = {
@@ -26,28 +26,27 @@ logging_configuration = {
 }
 try:
     summary = apply_observability_config(runtime_arn, logging_configuration)
-    print(...log group dan sampling rate...)
+    print(...log group and sampling rate...)
 except Exception as e:
     print(f"  [Note] Observability configuration failed: {e}")
 ```
 
-`try/except` diminta rubric: kegagalan observability tidak boleh menggagalkan
-deploy agent. Agent tetap melayani customer walaupun tracing bermasalah.
+The rubric asks for `try/except`: an observability failure must not fail the agent
+deployment. The agent keeps serving customers even if tracing breaks.
 
-`apply_observability_config()` (sudah disediakan) lalu:
-1. Membuat log group jika belum ada.
-2. Mengaktifkan **CloudWatch Transaction Search** (mekanisme yang dipakai AgentCore
-   Observability): tujuan segment X-Ray → CloudWatch Logs `aws/spans`, dengan
-   indexing 100%.
-3. Menyimpan setting sebagai env var runtime (`AGENT_LOG_LEVEL`,
+The provided `apply_observability_config()` then:
+1. Creates the log group if needed.
+2. Enables **CloudWatch Transaction Search** (the mechanism AgentCore Observability
+   uses): X-Ray segments go to CloudWatch Logs `aws/spans`, indexed at 100%.
+3. Stores the settings as runtime env vars (`AGENT_LOG_LEVEL`,
    `AGENT_LOG_TO_CLOUDWATCH`, `AGENT_TRACING_ENABLED`, `AGENT_TRACE_SAMPLING_RATE`)
-   dan menjalankan `agentcore deploy` kedua kalinya.
+   and runs `agentcore deploy` a second time.
 
-## Bagaimana trace terbentuk
+## How traces are built
 
-`agent_observability.py` membungkus decorator `@tool`:
+`agent_observability.py` wraps the `@tool` decorator:
 
-| Tool | Node di Service Map |
+| Tool | Node on the map |
 |---|---|
 | `route_to_inventory_agent` | **InventoryAgent** |
 | `route_to_policy_agent` | **PolicyAgent** |
@@ -55,35 +54,25 @@ deploy agent. Agent tetap melayani customer walaupun tracing bermasalah.
 | `route_to_communication_agent` | **CommunicationAgent** |
 | `retrieve_from_knowledge_base()` | **KnowledgeBase:returns / shipping / warranty** |
 
-Hasilnya di X-Ray Service Map:
+The retrievers run on other threads (ThreadPoolExecutor). New threads don't inherit
+the trace *context*, so the tracer falls back to "adopting" KB nodes into an open
+node — the graph stays connected (in the console the KB nodes appear next to the
+workers under `NovaMart-Orchestrator`).
 
-```
-NovaMart-Orchestrator ─┬─ InventoryAgent
-                       ├─ RefundAgent
-                       ├─ PolicyAgent ─┬─ KnowledgeBase:returns
-                       │               ├─ KnowledgeBase:shipping
-                       │               └─ KnowledgeBase:warranty
-                       └─ CommunicationAgent
-```
-
-Retriever berjalan di thread lain (ThreadPoolExecutor). Thread baru tidak
-mewarisi *context* trace, jadi tracer memakai aturan fallback: node KB "diadopsi"
-oleh node `search_all_policies` yang sedang terbuka. Karena itu graph tetap tersambung.
-
-## Verifikasi dan screenshot
+## Verification and screenshot
 
 ```powershell
 python tests/test_agent.py task6
-python src/agent_orchestrator.py test        # 3 skenario → cetak X-Ray trace id
+python src/agent_orchestrator.py test        # 3 scenarios → prints X-Ray trace ids
 ```
 
-Tunggu 30–60 detik → **CloudWatch → Application Signals (APM) → Trace Map** (nama lama: X-Ray traces → Service map) → rentang
-*Last 5 minutes* → screenshot seluruh graph (deliverable wajib).
+Wait 30–60 seconds → **CloudWatch → Application Signals (APM) → Trace Map**
+(older consoles: *X-Ray traces → Service map*). Direct link:
+`https://console.aws.amazon.com/cloudwatch/home?region=us-east-1#xray:service-map/map`.
 
-Log agent bisa dilihat di **CloudWatch → Log groups →
-`/aws/bedrock/agentcore/udacity-agentcore`**.
+> Screenshot tip: pick a time range that covers **both the return and the policy
+> scenarios**. A 5-minute window after running only policy/math shows no
+> InventoryAgent or RefundAgent. Use 15m or 1h, then zoom in (+) until node names
+> are readable.
 
-> Tips screenshot: pilih rentang waktu yang mencakup **skenario retur dan skenario
-> policy**. Rentang 5 menit setelah menjalankan skenario policy/matematika saja
-> tidak akan menampilkan InventoryAgent dan RefundAgent. Pakai 15m atau 1h, lalu
-> perbesar peta (+) sampai nama node terbaca.
+Agent logs: **CloudWatch → Log groups → `/aws/bedrock/agentcore/udacity-agentcore`**.
