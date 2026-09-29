@@ -1,0 +1,318 @@
+$ python src/agent_orchestrator.py test   (run 2026-09-29)
+
+Running local agent test...
+
+────────────────────────────────────────────────────────────
+Session: 71b3204c | Customer: CUST-001
+Query: I want to return my wireless headphones from order ORD-27176
+I'll help you with your return request. Let me start by initializing the session and then gathering the details about your order.
+Tool #1: initialize_session
+Now let me retrieve your order information:
+Tool #2: route_to_inventory_agent
+
+  ────────────────────────────────────────────────────────────────────
+  [ STEP 01 ]  INVENTORY AGENT
+             Role  : Fetch order details and customer tier from DynamoDB
+             Model : us.anthropic.claude-sonnet-4-5-20250929-v1:0
+  ────────────────────────────────────────────────────────────────────
+    [AGENT REASONING - InventoryAgent]
+
+Tool #1: get_customer_tier
+
+Tool #2: check_order_status
+CUSTOMER: Alice Johnson (CUST-001) | Tier: Premium
+ORDER: ORD-27176 | Wireless Headphones Pro | status: return_initiated | qty: 1 | price: $149.99
+DATES: ordered 2026-09-17 | delivered 2026-09-22 | 12 days since order
+TRACKING: TRK100000100
+NOTES: A return has already been initiated for this order on 2026-09-29. Return reference: RMA-66D6D120. Refund amount: $149.99. The order has not yet been marked as delivered (days_since_delivery is null), though an estimated delivery date of 2026-09-22 was provided.             Status : [COMPLETE]  Elapsed: 10.9s  (LLM may still stream final text below)
+             State  : DynamoDB[inventory_agent]  version 0 -> 1
+Now let me route this to the Refund Agent to process your return:
+Tool #3: route_to_refund_agent
+
+  ────────────────────────────────────────────────────────────────────
+  [ STEP 02 ]  REFUND AGENT
+             Role  : Evaluate return eligibility using inventory and policy data
+             Model : us.anthropic.claude-sonnet-4-5-20250929-v1:0
+  ────────────────────────────────────────────────────────────────────
+    [AGENT REASONING - RefundAgent]
+
+Tool #1: get_inventory_context
+DECISION: NO_ACTION
+ORDER: ORD-27176 - Wireless Headphones Pro
+TIER / WINDOW: Premium / 60 days | days since delivery: N/A (return already initiated)
+REASON: A return has already been initiated for this order on 2026-09-29 with return reference RMA-66D6D120. The refund amount of $149.99 is already being processed.
+RETURN REFERENCE: RMA-66D6D120 (existing)
+NEXT STEPS: Your return is already in progress under reference RMA-66D6D120. Please follow the return instructions you received when the return was initiated. If you need additional assistance with your existing return, please contact customer support with your return reference number.             Status : [COMPLETE]  Elapsed: 9.6s  (LLM may still stream final text below)
+             State  : DynamoDB[refund_agent]  version 1 -> 2
+Now let me get the final response for you:
+Tool #4: route_to_communication_agent
+
+  ────────────────────────────────────────────────────────────────────
+  [ STEP 03 ]  COMMUNICATION AGENT
+             Role  : Compose the final customer-facing response
+             Model : us.anthropic.claude-sonnet-4-5-20250929-v1:0
+  ────────────────────────────────────────────────────────────────────
+    [AGENT REASONING - CommunicationAgent]
+
+Tool #1: get_full_workflow_context
+Hello Alice,
+
+Thank you for reaching out about your Wireless Headphones Pro from order ORD-27176.
+
+Good news - a return has already been initiated for this order on September 29, 2026. Your return reference number is RMA-66D6D120, and your refund of $149.99 is being processed.
+
+You should have received return instructions when the return was initiated. Please follow those instructions to send the item back to us. Once we receive and inspect the headphones, your refund will be completed.
+
+If you didn't receive the return instructions or need any additional help with your existing return, please reply to this message with your return reference number (RMA-66D6D120) and we'll be happy to assist you further.
+
+Best regards,
+NovaMart Customer Support             Status : [COMPLETE]  Elapsed: 9.8s  (LLM may still stream final text below)
+             State  : DynamoDB[communication_agent]  version 2 -> 3
+Hello Alice,
+
+Thank you for reaching out about your Wireless Headphones Pro from order ORD-27176.
+
+Good news - a return has already been initiated for this order on September 29, 2026. Your return reference number is RMA-66D6D120, and your refund of $149.99 is being processed.
+
+You should have received return instructions when the return was initiated. Please follow those instructions to send the item back to us. Once we receive and inspect the headphones, your refund will be completed.
+
+If you didn't receive the return instructions or need any additional help with your existing return, please reply to this message with your return reference number (RMA-66D6D120) and we'll be happy to assist you further.
+
+Best regards,
+NovaMart Customer SupportResponse: Hello Alice,
+
+Thank you for reaching out about your Wireless Headphones Pro from order ORD-27176.
+
+Good news - a return has already been initiated for this order on September 29, 2026. Your return reference number is RMA-66D6D120, and your refund of $149.99 is being processed.
+
+You should have received return instructions when the return was initiated. Please follow those instructions to send the item back to us. Once we receive and inspect the headphones, your refund will be completed.
+
+If you didn't receive the return instructions or need any additional help with your existing return, please reply to this message with your return reference number (RMA-66D6D120) and we'll be happy to assist you further.
+
+Best regards,
+NovaMart Customer Support
+
+
+  X-Ray trace 1-6abb4de4-27433722a94b6b22161e87bc published successfully.
+  Allow 30-60 seconds, then open the Service Map and select 'Last 5 minutes':
+  https://console.aws.amazon.com/cloudwatch/home?region=us-east-1#xray:service-map/map
+  Submission step: take a screenshot showing the full NovaMart-Orchestrator → worker-agent call chain.
+
+────────────────────────────────────────────────────────────
+Session: bac08fd7 | Customer: CUST-002
+Query: What is the return policy for premium customers?
+I'll help you with that question about the return policy for premium customers.
+Tool #5: initialize_session
+Now let me retrieve the policy information for you:
+Tool #6: route_to_policy_agent
+
+  ────────────────────────────────────────────────────────────────────
+  [ STEP 04 ]  POLICY AGENT
+             Role  : Multi-Agent RAG -- parallel KB retrieval + synthesis
+             Model : us.anthropic.claude-sonnet-4-5-20250929-v1:0
+  ────────────────────────────────────────────────────────────────────
+    [AGENT REASONING - PolicyAgent]
+
+Tool #1: search_all_policies
+    [PARALLEL RETRIEVAL - START]  Spawning 3 sub-agents concurrently via ThreadPoolExecutor
+    ──────────────────────────────────────────────────────
+    +-- [SUB-AGENT 01]  ReturnsRetriever   KB-ID: 9I6I8WHGH1
+    +-- [SUB-AGENT 02]  ShippingRetriever  KB-ID: XXS6MXFVYE
+    +-- [SUB-AGENT 03]  WarrantyRetriever  KB-ID: JF9F9JB9H0
+    Retrieving in parallel... (sub-agent output suppressed - clean results printed sequentially after [END])
+    ──────────────────────────────────────────────────────
+    [PARALLEL RETRIEVAL - END]  All 3 KBs responded  Elapsed: 11.8s
+
+    [SUB-AGENT 01]  ReturnsRetriever   KB: 9I6I8WHGH1
+      | NovaMart Customer Tier Program ================================ Last Updated: January 2025  TIER OVERVIEW NovaMart offers two customer tiers: Standard and Premium.  STANDARD TIER - Default tier for all new customers - 30-day return window - Standard shipping rates apply - 1-year warranty on electronics - Standard customer support response time: 24-48 hours  PREMIUM TIER Requirements: Spend $500+ in a calendar year OR place 20+ orders in a calendar year. Benefits: - Extended 60-day return window - Free expedited shipping on all orders - 3-year warranty on electronics - Priority customer support: response within 4 hours - Early access to sales and new product launches - Dedicated account manager for orders over $500  HOW TO UPGRADE Customers are automatically upgraded to Premium when they meet the spending or order threshold. An email notification is sent upon upgrade. Tier status is evaluated on a rolling 12-month basis.  TIER DOWNGRADE If a customer falls below the Premium threshold for 12 consecutive months, they will be moved back to Standard tier with 30 days notice.
+      | Source: s3://udacity-agentcore-policy-docs-050430061024-0e8b6200/policies/returns/customer_tiers.txt
+      | NovaMart Return Policy ======================= Last Updated: January 2025  STANDARD RETURN WINDOW Customers may return most items within 30 days of delivery for a full refund. Premium tier customers receive an extended 60-day return window.
+      | Source: s3://udacity-agentcore-policy-docs-050430061024-0e8b6200/policies/returns/return_policy.txt
+
+    [SUB-AGENT 02]  ShippingRetriever  KB: XXS6MXFVYE
+      | **Passage 1 | Score: 0.700**
+      | NovaMart Customer Tier Program ================================ Last Updated: January 2025  TIER OVERVIEW NovaMart offers two customer tiers: Standard and Premium.  STANDARD TIER - Default tier for all new customers - 30-day return window - Standard shipping rates apply - 1-year warranty on electronics - Standard customer support response time: 24-48 hours  PREMIUM TIER Requirements: Spend $500+ in a calendar year OR place 20+ orders in a calendar year. Benefits: - Extended 60-day return window - Free expedited shipping on all orders - 3-year warranty on electronics - Priority customer support: response within 4 hours - Early access to sales and new product launches - Dedicated account manager for orders over $500  HOW TO UPGRADE Customers are automatically upgraded to Premium when they meet the spending or order threshold. An email notification is sent upon upgrade. Tier status is evaluated on a rolling 12-month basis.  TIER DOWNGRADE If a customer falls below the Premium threshold for 12 consecutive months, they will be moved back to Standard tier with 30 days notice.
+      | Source: s3://udacity-agentcore-policy-docs-050430061024-0e8b6200/policies/shipping/customer_tiers.txt
+
+    [SUB-AGENT 03]  WarrantyRetriever  KB: JF9F9JB9H0
+      | **Passage 1:**
+      | NovaMart Customer Tier Program ================================ Last Updated: January 2025  TIER OVERVIEW NovaMart offers two customer tiers: Standard and Premium.  STANDARD TIER - Default tier for all new customers - 30-day return window - Standard shipping rates apply - 1-year warranty on electronics - Standard customer support response time: 24-48 hours  PREMIUM TIER Requirements: Spend $500+ in a calendar year OR place 20+ orders in a calendar year. Benefits: - Extended 60-day return window - Free expedited shipping on all orders - 3-year warranty on electronics - Priority customer support: response within 4 hours - Early access to sales and new product launches - Dedicated account manager for orders over $500  HOW TO UPGRADE Customers are automatically upgraded to Premium when they meet the spending or order threshold. An email notification is sent upon upgrade. Tier status is evaluated on a rolling 12-month basis.  TIER DOWNGRADE If a customer falls below the Premium threshold for 12 consecutive months, they will be moved back to Standard tier with 30 days notice.
+      | Source: s3://udacity-agentcore-policy-docs-050430061024-0e8b6200/policies/warranty/customer_tiers.txt
+      | **Passage 2:**
+      | NovaMart Warranty Policy ========================== Last Updated: January 2025  STANDARD WARRANTY All NovaMart products come with a 1-year limited warranty against manufacturing defects. Electronics carry a 2-year warranty.  WARRANTY COVERAGE The warranty covers: - Manufacturing defects - Hardware failures under normal use - Defective materials  The warranty does NOT cover: - Damage from accidents, misuse, or negligence - Normal wear and tear - Water damage (unless product is rated waterproof) - Unauthorized modifications or repairs - Cosmetic damage (scratches, dents)  WARRANTY CLAIMS To file a warranty claim: 1. Contact support with proof of purchase and description of the defect. 2. Our team will assess the claim within 2 business days. 3. If approved, we will repair, replace, or refund at our discretion.  EXTENDED WARRANTY NovaMart Protection Plans are available for 2 or 3 years of additional coverage. Plans cover accidental damage in addition to manufacturing defects. Purchase within 30 days of product purchase for eligibility.  PREMIUM CUSTOMER WARRANTY Premium tier customers receive an automatic 3-year warranty on all Electronics.
+      | Source: s3://udacity-agentcore-policy-docs-050430061024-0e8b6200/policies/warranty/warranty_policy.txt
+Based on the retrieved policy documents, here is the **return policy for Premium customers**:
+
+**Return Window:**
+- Premium customers have an **extended 60-day return window** (compared to 30 days for Standard customers) to return most items for a full refund from the date of delivery.
+
+**Premium Tier Requirements:**
+To qualify for Premium tier, customers must:
+- Spend $500+ in a calendar year, OR
+- Place 20+ orders in a calendar year
+
+**Additional Premium Benefits** (beyond returns):
+- Free expedited shipping on all orders
+- 3-year warranty on electronics
+- Priority customer support (response within 4 hours)
+- Early access to sales and new product launches
+- Dedicated account manager for orders over $500
+
+**Note:** Customers are automatically upgraded to Premium when they meet the threshold, and tier status is evaluated on a rolling 12-month basis.
+
+*(Sources: Returns Policy and Customer Tier Program documents)*             Status : [COMPLETE]  Elapsed: 21.8s  (LLM may still stream final text below)
+             State  : DynamoDB[policy_agent]  version 0 -> 1
+Now let me get the final response for you:
+Tool #7: route_to_communication_agent
+
+  ────────────────────────────────────────────────────────────────────
+  [ STEP 05 ]  COMMUNICATION AGENT
+             Role  : Compose the final customer-facing response
+             Model : us.anthropic.claude-sonnet-4-5-20250929-v1:0
+  ────────────────────────────────────────────────────────────────────
+    [AGENT REASONING - CommunicationAgent]
+
+Tool #2: get_full_workflow_context
+Hello,
+
+Thank you for reaching out! Here is the return policy for Premium customers:
+
+Premium customers enjoy an extended 60-day return window from the date of delivery to return most items for a full refund. This is double the 30-day window that Standard customers receive.
+
+To qualify for Premium tier, you need to either spend $500 or more in a calendar year, or place 20 or more orders in a calendar year. Once you meet either threshold, you're automatically upgraded to Premium status.
+
+In addition to the extended return window, Premium customers also receive:
+- Free expedited shipping on all orders
+- 3-year warranty on electronics
+- Priority customer support with response within 4 hours
+- Early access to sales and new product launches
+- A dedicated account manager for orders over $500
+
+Your tier status is evaluated on a rolling 12-month basis, so your benefits continue as long as you maintain the qualifying activity.
+
+If you have any other questions, please feel free to reply to this message.
+
+Best regards,
+NovaMart Customer Support             Status : [COMPLETE]  Elapsed: 9.2s  (LLM may still stream final text below)
+             State  : DynamoDB[communication_agent]  version 1 -> 2
+Hello,
+
+Thank you for reaching out! Here is the return policy for Premium customers:
+
+Premium customers enjoy an extended 60-day return window from the date of delivery to return most items for a full refund. This is double the 30-day window that Standard customers receive.
+
+To qualify for Premium tier, you need to either spend $500 or more in a calendar year, or place 20 or more orders in a calendar year. Once you meet either threshold, you're automatically upgraded to Premium status.
+
+In addition to the extended return window, Premium customers also receive:
+- Free expedited shipping on all orders
+- 3-year warranty on electronics
+- Priority customer support with response within 4 hours
+- Early access to sales and new product launches
+- A dedicated account manager for orders over $500
+
+Your tier status is evaluated on a rolling 12-month basis, so your benefits continue as long as you maintain the qualifying activity.
+
+If you have any other questions, please feel free to reply to this message.
+
+Best regards,
+NovaMart Customer SupportResponse: Hello,
+
+Thank you for reaching out! Here is the return policy for Premium customers:
+
+Premium customers enjoy an extended 60-day return window from the date of delivery to return most items for a full refund. This is double the 30-day window that Standard customers receive.
+
+To qualify for Premium tier, you need to either spend $500 or more in a calendar year, or place 20 or more orders in a calendar year. Once you meet either threshold, you're automatically upgraded to Premium status.
+
+In addition to the extended return window, Premium customers also receive:
+- Free expedited shipping on all orders
+- 3-year warranty on electronics
+- Priority customer support with response within 4 hours
+- Early access to sales and new product launches
+- A dedicated account manager for orders over $500
+
+Your tier status is evaluated on a rolling 12-month basis, so your benefits continue as long as you maintain the qualifying activity.
+
+If you have any other questions, please feel free to reply to this message.
+
+Best regards,
+NovaMart Customer Support
+
+
+  X-Ray trace 1-6abb4e15-12ba9d890bf957ad0212f9cb published successfully.
+  Allow 30-60 seconds, then open the Service Map and select 'Last 5 minutes':
+  https://console.aws.amazon.com/cloudwatch/home?region=us-east-1#xray:service-map/map
+  Submission step: take a screenshot showing the full NovaMart-Orchestrator → worker-agent call chain.
+
+────────────────────────────────────────────────────────────
+Session: 9b115ca6 | Customer: CUST-003
+Query: How much would 5 items at $29.99 be with a 10% discount?
+I'll help you with that calculation.
+Tool #8: initialize_session
+Now let me get the calculation for you:
+Tool #9: route_to_communication_agent
+
+  ────────────────────────────────────────────────────────────────────
+  [ STEP 06 ]  COMMUNICATION AGENT
+             Role  : Compose the final customer-facing response
+             Model : us.anthropic.claude-sonnet-4-5-20250929-v1:0
+  ────────────────────────────────────────────────────────────────────
+    [AGENT REASONING - CommunicationAgent]
+
+Tool #3: get_full_workflow_context
+Hello,
+
+Thank you for reaching out! Let me calculate that for you.
+
+Here's the breakdown:
+
+- 5 items at $29.99 each = 5 × $29.99 = $149.95
+- 10% discount on $149.95 = $149.95 × 0.10 = $14.995
+- Subtotal after discount = $149.95 - $14.995 = $134.955
+- Final amount = $134.96 (rounded to the nearest cent)
+
+So 5 items at $29.99 each with a 10% discount would come to $134.96.
+
+If you have any other questions or need assistance with an order, feel free to reply to this message.
+
+Best regards,
+NovaMart Customer Support             Status : [COMPLETE]  Elapsed: 8.4s  (LLM may still stream final text below)
+             State  : DynamoDB[communication_agent]  version 0 -> 1
+Hello,
+
+Thank you for reaching out! Let me calculate that for you.
+
+Here's the breakdown:
+
+- 5 items at $29.99 each = 5 × $29.99 = $149.95
+- 10% discount on $149.95 = $149.95 × 0.10 = $14.995
+- Subtotal after discount = $149.95 - $14.995 = $134.955
+- Final amount = $134.96 (rounded to the nearest cent)
+
+So 5 items at $29.99 each with a 10% discount would come to $134.96.
+
+If you have any other questions or need assistance with an order, feel free to reply to this message.
+
+Best regards,
+NovaMart Customer SupportResponse: Hello,
+
+Thank you for reaching out! Let me calculate that for you.
+
+Here's the breakdown:
+
+- 5 items at $29.99 each = 5 × $29.99 = $149.95
+- 10% discount on $149.95 = $149.95 × 0.10 = $14.995
+- Subtotal after discount = $149.95 - $14.995 = $134.955
+- Final amount = $134.96 (rounded to the nearest cent)
+
+So 5 items at $29.99 each with a 10% discount would come to $134.96.
+
+If you have any other questions or need assistance with an order, feel free to reply to this message.
+
+Best regards,
+NovaMart Customer Support
+
+
+  X-Ray trace 1-6abb4e45-0972269d9186d7a014d28167 published successfully.
+  Allow 30-60 seconds, then open the Service Map and select 'Last 5 minutes':
+  https://console.aws.amazon.com/cloudwatch/home?region=us-east-1#xray:service-map/map
+  Submission step: take a screenshot showing the full NovaMart-Orchestrator → worker-agent call chain.

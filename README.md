@@ -206,7 +206,7 @@ Detailed notes: [`docs/02-multi-agent-graph.md`](docs/02-multi-agent-graph.md).
 python src/agent_orchestrator.py deploy     # 6-step pipeline, first run ~15 min (CDK bootstrap)
 ```
 
-Deployed resources (values in the local `.env`, which is git-ignored):
+Deployed resources (values in [`.env`](.env), included in the repo for review — it holds only resource IDs, no AWS credentials):
 
 | Variable | Value |
 |---|---|
@@ -232,6 +232,55 @@ python tests/test_agent.py all
 Full run, in order: [1](screenshots/test_all_120_1.png) · [2](screenshots/test_all_120_2.png) ·
 [3](screenshots/test_all_120_3.png) · [4](screenshots/test_all_120_4.png) ·
 [5 — `Score: 120/120 pts (100%)`](screenshots/test_all_120_5.png)
+
+### Local agent test — `python src/agent_orchestrator.py test`
+
+The three built-in scenarios (return request, premium return policy, discount calculation)
+run locally against the live KBs, guardrail and DynamoDB state, and each publishes an X-Ray trace.
+Full console output: [`screenshots/agent_orchestrator_test_output.txt`](screenshots/agent_orchestrator_test_output.txt).
+
+| Scenario 1 — return ORD-27176 | Scenario 2 — premium return policy (3 KBs in parallel) | Scenario 3 — 5 × $29.99, 10% off |
+|---|---|---|
+| ![Test scenario 1](screenshots/orchestrator_test_1_1.png) | ![Test scenario 2 - parallel KB retrieval](screenshots/orchestrator_test_2_2.png) | ![Test scenario 3](screenshots/orchestrator_test_3_3.png) |
+
+Full run, in order —
+Scenario 1: [1](screenshots/orchestrator_test_1_1.png) · [2](screenshots/orchestrator_test_1_2.png) ·
+[3](screenshots/orchestrator_test_1_3.png) · [4](screenshots/orchestrator_test_1_4.png) —
+Scenario 2: [1](screenshots/orchestrator_test_2_1.png) · [2](screenshots/orchestrator_test_2_2.png) ·
+[3](screenshots/orchestrator_test_2_3.png) · [4](screenshots/orchestrator_test_2_4.png) ·
+[5](screenshots/orchestrator_test_2_5.png) · [6](screenshots/orchestrator_test_2_6.png) ·
+[7](screenshots/orchestrator_test_2_7.png) —
+Scenario 3: [1](screenshots/orchestrator_test_3_1.png) · [2](screenshots/orchestrator_test_3_2.png) ·
+[3](screenshots/orchestrator_test_3_3.png)
+
+### Deployment in the AWS Console
+
+| Resource | Screenshot |
+|---|---|
+| Bedrock → Knowledge Bases: the 3 KBs, all **Available** | ![Knowledge bases list](screenshots/console_knowledge_bases.png) |
+| Returns KB (`9I6I8WHGH1`) — Titan V2 embeddings, S3 Vectors store `returns-policy-index` | ![Returns KB vector store](screenshots/console_kb_returns_vector_store.png) |
+| Returns KB — data source `policies/returns/` synced | ![Returns KB sync](screenshots/console_kb_returns_sync.png) |
+| Shipping KB (`XXS6MXFVYE`) — Titan V2 embeddings, S3 Vectors store `shipping-policy-index` | ![Shipping KB vector store](screenshots/console_kb_shipping_vector_store.png) |
+| Shipping KB — data source `policies/shipping/` synced | ![Shipping KB sync](screenshots/console_kb_shipping_sync.png) |
+| Warranty KB (`JF9F9JB9H0`) — Titan V2 embeddings, S3 Vectors store `warranty-policy-index` | ![Warranty KB vector store](screenshots/console_kb_warranty_vector_store.png) |
+| Warranty KB — data source `policies/warranty/` synced | ![Warranty KB sync](screenshots/console_kb_warranty_sync.png) |
+| Bedrock AgentCore → Runtime: `udacity_agentcore_runtime` **Ready** | ![AgentCore runtime](screenshots/console_agentcore_runtime.png) |
+| Bedrock → Guardrails: `udacity-agentcore-guardrail` version 2 | ![Guardrail](screenshots/console_guardrail.png) |
+| Invoking the deployed runtime from the terminal | ![Runtime invoke](screenshots/agentcore_invoke.png) |
+
+Knowledge Base configuration as reported by `aws bedrock-agent get-knowledge-base` / `get-data-source` /
+`list-ingestion-jobs` (all three share the stack's `VectorStoreBucket`,
+`udacity-agentcore-vectors-<account>-0e8b6200`, and the `PolicyDocsBucket` as data source):
+
+| KB | ID | Embedding model | Vector store (S3 Vectors index) | Data source prefix | Last sync |
+|---|---|---|---|---|---|
+| `novamart-returns-policy-kb` | `9I6I8WHGH1` | `amazon.titan-embed-text-v2:0` | `returns-policy-index` | `policies/returns/` | COMPLETE — 2 docs, 0 failed |
+| `novamart-shipping-policy-kb` | `XXS6MXFVYE` | `amazon.titan-embed-text-v2:0` | `shipping-policy-index` | `policies/shipping/` | COMPLETE — 2 docs, 0 failed |
+| `novamart-warranty-policy-kb` | `JF9F9JB9H0` | `amazon.titan-embed-text-v2:0` | `warranty-policy-index` | `policies/warranty/` | COMPLETE — 2 docs, 0 failed |
+
+Models (constants in [`config.py`](config.py), not hard-coded in the agents): Orchestrator
+`config.ORCHESTRATOR_MODEL_ID` = `us.anthropic.claude-haiku-4-5-20251001-v1:0`; all four workers
+`config.WORKER_MODEL_ID` = `us.anthropic.claude-sonnet-4-5-20250929-v1:0`. Both are also listed in `.env` for reference.
 
 ### End-to-end scenarios (deployed runtime)
 
@@ -332,7 +381,9 @@ Line numbers refer to `src/agent_orchestrator.py`.
 
 - [x] `src/agent_orchestrator.py` — all TODOs implemented (Tasks 2, 3, 4, 6)
 - [x] Three Bedrock Knowledge Bases created and synced (Task 5)
-- [x] `.env` populated (KB IDs, runtime ARN, guardrail ID + numbered version)
+- [x] `.env` populated (KB IDs, runtime ARN, guardrail ID + numbered version) and included in the repo
+- [x] Screenshot: `python src/agent_orchestrator.py test` (`screenshots/orchestrator_test_*.png`)
+- [x] Screenshots: AWS Console — 3 Knowledge Bases, AgentCore Runtime, Guardrail (`screenshots/console_*.png`)
 - [x] Screenshot: `python tests/test_agent.py all` → 120/120 (`screenshots/test_all_120_1..5.png`)
 - [x] Screenshot: X-Ray Service Map / Trace Map (`screenshots/xray_service_map.png`)
 
